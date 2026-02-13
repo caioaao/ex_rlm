@@ -10,14 +10,22 @@ defmodule ExRLM.Repl do
 
   alias ExRLM.LLM
 
-  defstruct [:lua_state, :model, :recursive_model, :max_iterations, :max_depth]
+  defstruct [:lua_state, :model, :recursive_model, :max_iterations, :max_depth, history: []]
+
+  @type history_entry :: %{
+          iteration: non_neg_integer(),
+          code: String.t(),
+          outcome: :success | :error,
+          result: String.t()
+        }
 
   @type t :: %__MODULE__{
           lua_state: term(),
           model: String.t(),
           recursive_model: String.t(),
           max_iterations: pos_integer(),
-          max_depth: non_neg_integer()
+          max_depth: non_neg_integer(),
+          history: [history_entry()]
         }
 
   @doc """
@@ -71,7 +79,7 @@ defmodule ExRLM.Repl do
 
     # Set context variable in Lua
     lua_state = Lua.set!(repl.lua_state, [:context], context)
-    repl = %{repl | lua_state: lua_state}
+    repl = %{repl | lua_state: lua_state, history: []}
 
     # Start iteration loop
     iterate(repl, query, context, 0, 0)
@@ -82,16 +90,20 @@ defmodule ExRLM.Repl do
        when iteration < repl.max_iterations and consecutive_errors < @max_consecutive_errors do
     Logger.debug("Iteration #{iteration}")
 
-    with {:ok, response} <- LLM.repl_completion(query, context, iteration, false, repl.model) do
+    with {:ok, response} <-
+           LLM.repl_completion(query, context, repl.history, iteration, false, repl.model) do
       process_response(repl, query, response, context, iteration, consecutive_errors)
     end
   end
 
   # Max iterations reached - force final answer
   defp iterate(repl, query, context, iteration, consecutive_errors) do
-    Logger.warning("Forcing final answer (iteration=#{iteration}, consecutive_errors=#{consecutive_errors})")
+    Logger.warning(
+      "Forcing final answer (iteration=#{iteration}, consecutive_errors=#{consecutive_errors})"
+    )
 
-    with {:ok, response} <- LLM.repl_completion(query, context, 0, true, repl.model) do
+    with {:ok, response} <-
+           LLM.repl_completion(query, context, repl.history, 0, true, repl.model) do
       case execute_response(repl.lua_state, response) do
         {:final_answer, answer, new_lua_state} ->
           {:ok, {%{repl | lua_state: new_lua_state}, answer}}
@@ -114,21 +126,22 @@ defmodule ExRLM.Repl do
         {:ok, {%{repl | lua_state: new_lua_state}, answer}}
 
       {:continue, result, new_lua_state} ->
-        new_context = append_to_context(context, iteration, response, result)
-        new_repl = %{repl | lua_state: new_lua_state}
-        iterate(new_repl, query, new_context, iteration + 1, 0)
+        entry = %{iteration: iteration, code: response, outcome: :success, result: result}
+        new_repl = %{repl | lua_state: new_lua_state, history: repl.history ++ [entry]}
+        iterate(new_repl, query, context, iteration + 1, 0)
 
       {:error, error_msg, lua_state} ->
         Logger.warning("Lua error at iteration #{iteration}: #{error_msg}")
-        new_context = append_error_to_context(context, iteration, response, error_msg)
-        new_repl = %{repl | lua_state: lua_state}
-        iterate(new_repl, query, new_context, iteration + 1, consecutive_errors + 1)
+        entry = %{iteration: iteration, code: response, outcome: :error, result: error_msg}
+        new_repl = %{repl | lua_state: lua_state, history: repl.history ++ [entry]}
+        iterate(new_repl, query, context, iteration + 1, consecutive_errors + 1)
     end
   end
 
   defp execute_response(lua_state, response) do
     try do
-      case Lua.eval!(lua_state, response) do
+      Lua.eval!(lua_state, response)
+      |> case do
         {["__rlm_final_answer__", answer], new_state} ->
           {:final_answer, format_result(answer), new_state}
 
@@ -139,21 +152,7 @@ defmodule ExRLM.Repl do
       e in [Lua.RuntimeException, Lua.CompilerException] ->
         {:error, Exception.message(e), lua_state}
     end
-  end
-
-  defp append_to_context(context, iteration, response, result) do
-    context <>
-      "\n\n--- Iteration #{iteration} ---\n" <>
-      "Code:\n```lua\n#{String.trim(response)}\n```\n" <>
-      "Result: #{result}"
-  end
-
-  defp append_error_to_context(context, iteration, response, error_msg) do
-    context <>
-      "\n\n--- Iteration #{iteration} ---\n" <>
-      "Code:\n```lua\n#{String.trim(response)}\n```\n" <>
-      "Error: #{error_msg}\n" <>
-      "Please fix the Lua syntax error and try again."
+    |> tap(&Logger.info("Result of lua eval:\n#{inspect(&1)}"))
   end
 
   defp format_result(nil), do: "nil"

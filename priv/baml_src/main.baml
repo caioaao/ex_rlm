@@ -48,18 +48,20 @@ function ReplFirstIteration(query: string, context: string) -> string {
     Use Lua comments (-- comment) to explain your reasoning.
 
     {{ _.role('user') }}
-    Write Lua code to answer the query: "{{ query }}"
+    IMPORTANT: You have not interacted with the REPL environment yet. Do not provide a final answer until you have sufficiently explored the context.
+
+    Think step-by-step on what to do using the REPL environment to answer: "{{ query }}"
 
     The context is available in the `context` Lua variable. Start by exploring it:
     1. Check size: #context
     2. Based on structure, decide how to chunk and analyze
 
-    IMPORTANT: You have not interacted with the REPL environment yet. Do not provide a final answer until you have sufficiently explored the context using the REPL. Think step by step, plan, and execute immediately in your response -- do not just say "I will do this".
+    Your next action:
   "#
 }
 
 // Continue iteration prompt (iteration > 0)
-function ReplContinue(query: string) -> string {
+function ReplContinue(query: string, history: string) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
@@ -79,18 +81,17 @@ function ReplContinue(query: string) -> string {
     - Synthesize: rlm.llm_query("Combine findings", combined)
 
     {{ _.role('user') }}
-    Continue writing Lua code to answer the query: "{{ query }}"
+    Think step-by-step on what to do using the REPL environment to answer: "{{ query }}"
 
-    Review your previous outputs and either:
-    - Continue exploring with more Lua code
-    - Call return rlm.answer("your answer") if you have gathered enough information
+    The history below shows your previous REPL interactions:
+    {{ history }}
 
-    Think step by step, plan, and execute immediately in your response -- do not just say "I will do this".
+    Your next action:
   "#
 }
 
 // Final answer prompt
-function ReplFinalAnswer(query: string) -> string {
+function ReplFinalAnswer(query: string, history: string) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
@@ -109,6 +110,9 @@ function ReplFinalAnswer(query: string) -> string {
 
     {{ _.role('user') }}
     Based on all the information you have gathered from the REPL environment, provide your final answer to the query: "{{ query }}"
+
+    Previous iterations:
+    {{ history }}
 
     You MUST call return rlm.answer("your answer") now. Synthesize your findings into a coherent final answer.
   "#

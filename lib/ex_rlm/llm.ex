@@ -17,21 +17,44 @@ defmodule ExRLM.LLM do
   - iteration>0, final_answer=false: Continue exploration (ReplContinue)
   - final_answer=true: Force final answer synthesis (ReplFinalAnswer)
   """
-  @spec repl_completion(String.t(), String.t(), integer(), boolean(), String.t()) ::
+  @spec repl_completion(String.t(), String.t(), list(map()), integer(), boolean(), String.t()) ::
           {:ok, String.t()} | {:error, term()}
-  def repl_completion(query, context, iteration, final_answer, model) do
+  def repl_completion(query, context, history, iteration, final_answer, model) do
     opts = %{llm_client: client_for_model(model)}
+    formatted_history = format_history(history)
 
     cond do
       final_answer ->
-        __MODULE__.ReplFinalAnswer.call(%{query: query}, opts)
+        __MODULE__.ReplFinalAnswer.call(%{query: query, history: formatted_history}, opts)
 
       iteration == 0 ->
         __MODULE__.ReplFirstIteration.call(%{query: query, context: context}, opts)
 
       true ->
-        __MODULE__.ReplContinue.call(%{query: query}, opts)
+        __MODULE__.ReplContinue.call(%{query: query, history: formatted_history}, opts)
     end
+  end
+
+  defp format_history([]), do: "(No previous iterations)"
+
+  defp format_history(history) do
+    history
+    |> Enum.map(fn entry ->
+      outcome_text =
+        if entry.outcome == :success,
+          do: "Result: #{entry.result}",
+          else: "Error: #{entry.result}\nPlease fix the error and continue."
+
+      """
+      --- Iteration #{entry.iteration} ---
+      Code:
+      ```lua
+      #{String.trim(entry.code)}
+      ```
+      #{outcome_text}
+      """
+    end)
+    |> Enum.join("\n")
   end
 
   @doc """
