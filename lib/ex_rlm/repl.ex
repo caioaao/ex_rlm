@@ -15,17 +15,29 @@ defmodule ExRLM.Repl do
   Creates a new Repl instance with the given options.
 
   ## Options
-    * `:model` - The primary model to use for completions
-    * `:recursive_model` - The model to use for recursive calls
+    * `:model` - The primary model to use for completions (required)
+    * `:recursive_model` - The model to use for recursive calls (defaults to `:model`)
+    * `:max_iterations` - Maximum number of iterations (default: 10)
+    * `:max_depth` - Maximum depth of recursion (default: 10)
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
-    lua_state = Lua.new()
+    model = Keyword.fetch!(opts, :model)
+    recursive_model = Keyword.get(opts, :recursive_model, model)
+    max_iterations = Keyword.get(opts, :max_iterations, 10)
+    max_depth = Keyword.get(opts, :max_depth, 10)
+
+    lua_state =
+      ExRLM.Lua.new(
+        model: recursive_model,
+        max_iterations: max_iterations,
+        max_depth: max_depth
+      )
 
     %__MODULE__{
       lua_state: lua_state,
-      model: Keyword.fetch!(opts, :model),
-      recursive_model: Keyword.get(opts, :recursive_model, Keyword.fetch!(opts, :model))
+      model: model,
+      recursive_model: recursive_model
     }
   end
 
