@@ -6,6 +6,8 @@ defmodule ExRLM.Repl do
   the sentinel value returned by `rlm.answer(value)`.
   """
 
+  require Logger
+
   alias ExRLM.LLM
 
   defstruct [:lua_state, :model, :recursive_model, :max_iterations, :max_depth]
@@ -42,13 +44,16 @@ defmodule ExRLM.Repl do
         completion_fn: &LLM.llm_query/3
       )
 
-    %__MODULE__{
+    repl = %__MODULE__{
       lua_state: lua_state,
       model: model,
       recursive_model: recursive_model,
       max_iterations: max_iterations,
       max_depth: max_depth
     }
+
+    Logger.debug("REPL created with model=#{model}, max_iterations=#{max_iterations}")
+    repl
   end
 
   @doc """
@@ -62,6 +67,7 @@ defmodule ExRLM.Repl do
   @spec completion(t(), String.t(), keyword()) :: {:ok, {t(), String.t()}} | {:error, term()}
   def completion(repl, query, opts \\ []) do
     context = Keyword.get(opts, :context, "")
+    Logger.info("Starting completion for query: #{String.slice(query, 0, 100)}...")
 
     # Set context variable in Lua
     lua_state = Lua.set!(repl.lua_state, [:context], context)
@@ -74,13 +80,17 @@ defmodule ExRLM.Repl do
   # Main iteration loop - continues until FINAL or max_iterations
   defp iterate(repl, query, context, iteration, consecutive_errors)
        when iteration < repl.max_iterations and consecutive_errors < @max_consecutive_errors do
+    Logger.debug("Iteration #{iteration}")
+
     with {:ok, response} <- LLM.repl_completion(query, context, iteration, false, repl.model) do
       process_response(repl, query, response, context, iteration, consecutive_errors)
     end
   end
 
   # Max iterations reached - force final answer
-  defp iterate(repl, query, context, _iteration, _consecutive_errors) do
+  defp iterate(repl, query, context, iteration, consecutive_errors) do
+    Logger.warning("Forcing final answer (iteration=#{iteration}, consecutive_errors=#{consecutive_errors})")
+
     with {:ok, response} <- LLM.repl_completion(query, context, 0, true, repl.model) do
       case execute_response(repl.lua_state, response) do
         {:final_answer, answer, new_lua_state} ->
@@ -100,6 +110,7 @@ defmodule ExRLM.Repl do
   defp process_response(repl, query, response, context, iteration, consecutive_errors) do
     case execute_response(repl.lua_state, response) do
       {:final_answer, answer, new_lua_state} ->
+        Logger.info("Final answer received at iteration #{iteration}")
         {:ok, {%{repl | lua_state: new_lua_state}, answer}}
 
       {:continue, result, new_lua_state} ->
@@ -108,6 +119,7 @@ defmodule ExRLM.Repl do
         iterate(new_repl, query, new_context, iteration + 1, 0)
 
       {:error, error_msg, lua_state} ->
+        Logger.warning("Lua error at iteration #{iteration}: #{error_msg}")
         new_context = append_error_to_context(context, iteration, response, error_msg)
         new_repl = %{repl | lua_state: lua_state}
         iterate(new_repl, query, new_context, iteration + 1, consecutive_errors + 1)
