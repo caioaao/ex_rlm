@@ -27,22 +27,23 @@ function ReplFirstIteration(query: string, context: string) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
-    You are an AI that answers queries using a Lua REPL environment.
+    You are tasked with answering a query with associated context. You can access, transform, and analyze this context in a Lua REPL environment that can recursively query sub-LLMs. You will be queried iteratively until you provide a final answer.
 
-    IMPORTANT: Your response must be ONLY valid Lua code. No markdown, no explanations outside of Lua comments.
+    IMPORTANT: Your response must be ONLY valid Lua code. Do NOT wrap your code in markdown code blocks (no ```lua or ```). Just output the raw Lua code directly.
 
-    Available in the Lua environment:
-    - `context` - variable containing information relevant to the query
-    - `rlm.llm_query(query, context)` - query a sub-LLM (supports ~500K chars)
+    The REPL environment is initialized with:
+    - `context` - variable containing information relevant to your query
+    - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars)
     - `rlm.answer(value)` - return your final answer
 
-    Strategy for large contexts:
-    1. Chunk context intelligently (by headers, paragraphs, logical sections)
-    2. Query sub-LLMs on chunks using rlm.llm_query()
-    3. Accumulate results in variables
-    4. When ready, call: return rlm.answer("your final answer")
+    You will only see truncated outputs from the REPL environment, so you should use rlm.llm_query() on variables you want to analyze. Return the value you want to inspect at the end of your script to see it in the next iteration.
 
-    You can also return a variable's value: return rlm.answer(my_result_variable)
+    Make sure to explicitly look through the context in the REPL before answering your query. An example strategy is to first look at the context and figure out a chunking strategy, then break up the context into chunks, query an LLM per chunk with a particular question and save the answers to a buffer, then query an LLM with all the buffers to produce your final answer.
+
+    Strategies for handling large contexts:
+    1. Direct query: Call rlm.llm_query() directly on the context if it fits
+    2. Size-based chunking: Split context into fixed-size chunks using string.sub(), query each chunk, accumulate results in a table, then synthesize
+    3. Header-based splitting: Use string.gmatch() to split by headers/sections, query each section, combine results
 
     Use Lua comments (-- comment) to explain your reasoning.
 
@@ -53,7 +54,7 @@ function ReplFirstIteration(query: string, context: string) -> string {
     1. Check size: #context
     2. Based on structure, decide how to chunk and analyze
 
-    IMPORTANT: You have not interacted with the REPL environment yet. Do not provide a final answer until you have sufficiently explored the context using the REPL. Use rlm.llm_query() to analyze sections of the context.
+    IMPORTANT: You have not interacted with the REPL environment yet. Do not provide a final answer until you have sufficiently explored the context using the REPL. Think step by step, plan, and execute immediately in your response -- do not just say "I will do this".
   "#
 }
 
@@ -62,24 +63,29 @@ function ReplContinue(query: string) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
-    You are an AI that answers queries using a Lua REPL environment.
+    You are continuing to answer a query using a Lua REPL environment. You will be queried iteratively until you provide a final answer.
 
-    IMPORTANT: Your response must be ONLY valid Lua code. No markdown, no explanations outside of Lua comments.
+    IMPORTANT: Your response must be ONLY valid Lua code. Do NOT wrap your code in markdown code blocks (no ```lua or ```). Just output the raw Lua code directly.
 
     Available in the Lua environment:
     - `context` - variable containing information relevant to the query
-    - `rlm.llm_query(query, context)` - query a sub-LLM (supports ~500K chars)
+    - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars)
     - `rlm.answer(value)` - return your final answer
     - All variables from previous iterations are still available
 
-    Use Lua comments (-- comment) to explain your reasoning.
+    Common patterns:
+    - Accumulate: table.insert(results, rlm.llm_query(...))
+    - Combine: table.concat(results, "\n")
+    - Synthesize: rlm.llm_query("Combine findings", combined)
 
     {{ _.role('user') }}
     Continue writing Lua code to answer the query: "{{ query }}"
 
-    Review your previous work and either:
+    Review your previous outputs and either:
     - Continue exploring with more Lua code
     - Call return rlm.answer("your answer") if you have gathered enough information
+
+    Think step by step, plan, and execute immediately in your response -- do not just say "I will do this".
   "#
 }
 
@@ -88,19 +94,23 @@ function ReplFinalAnswer(query: string) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
-    You are an AI that answers queries using a Lua REPL environment.
+    You must now provide your final answer using the Lua REPL environment.
 
-    IMPORTANT: Your response must be ONLY valid Lua code. No markdown, no explanations outside of Lua comments.
+    IMPORTANT: Your response must be ONLY valid Lua code. Do NOT wrap your code in markdown code blocks (no ```lua or ```). Just output the raw Lua code directly.
 
     Available in the Lua environment:
     - `context` - variable containing information relevant to the query
     - `rlm.answer(value)` - return your final answer
     - All variables from previous iterations are still available
 
+    Example - synthesize accumulated results:
+    local combined = table.concat(results, "\n\n")
+    return rlm.answer("Based on my analysis: " .. combined)
+
     {{ _.role('user') }}
     Based on all the information you have gathered from the REPL environment, provide your final answer to the query: "{{ query }}"
 
-    You MUST call return rlm.answer("your answer") now. Synthesize your findings into a final answer.
+    You MUST call return rlm.answer("your answer") now. Synthesize your findings into a coherent final answer.
   "#
 }
 
