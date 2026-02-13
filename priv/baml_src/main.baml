@@ -49,8 +49,9 @@ function ReplFirstIteration(query: string, context: string) -> string {
     {{ _.role('user') }}
     Write Lua code to answer the query: "{{ query }}"
 
-    The context variable contains:
-    {{ context }}
+    The context is available in the `context` Lua variable. Start by exploring it:
+    1. Check size: #context
+    2. Based on structure, decide how to chunk and analyze
 
     IMPORTANT: You have not interacted with the REPL environment yet. Do not provide a final answer until you have sufficiently explored the context using the REPL. Use rlm.llm_query() to analyze sections of the context.
   "#
