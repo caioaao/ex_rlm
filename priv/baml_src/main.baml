@@ -22,8 +22,7 @@ client<llm> GPT4Turbo {
   }
 }
 
-// First iteration prompt (iteration == 0)
-function ReplFirstIteration(query: string, context: string) -> string {
+function ReplCompletion(query: string, repl_history: string) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
@@ -34,9 +33,11 @@ function ReplFirstIteration(query: string, context: string) -> string {
     The REPL environment is initialized with:
     - `context` - variable containing information relevant to your query
     - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars)
-    - `rlm.answer(value)` - return your final answer
+    - `print(value)` - output values to see in the next iteration
+    - `return value` - return your final answer (ends the session)
+    - All variables from previous iterations are still available
 
-    You will only see truncated outputs from the REPL environment, so you should use rlm.llm_query() on variables you want to analyze. Return the value you want to inspect at the end of your script to see it in the next iteration.
+    Use print() to output intermediate results for inspection. Use return to provide your final answer.
 
     Make sure to explicitly look through the context in the REPL before answering your query. An example strategy is to first look at the context and figure out a chunking strategy, then break up the context into chunks, query an LLM per chunk with a particular question and save the answers to a buffer, then query an LLM with all the buffers to produce your final answer.
 
@@ -48,7 +49,7 @@ function ReplFirstIteration(query: string, context: string) -> string {
     Use Lua comments (-- comment) to explain your reasoning.
 
     {{ _.role('user') }}
-    IMPORTANT: You have not interacted with the REPL environment yet. Do not provide a final answer until you have sufficiently explored the context.
+    IMPORTANT: Do not provide a final answer until you have sufficiently explored the context.
 
     Think step-by-step on what to do using the REPL environment to answer: "{{ query }}"
 
@@ -56,42 +57,17 @@ function ReplFirstIteration(query: string, context: string) -> string {
     1. Check size: #context
     2. Based on structure, decide how to chunk and analyze
 
-    Your next action:
-  "#
-}
-
-// Continue iteration prompt (iteration > 0)
-function ReplContinue(query: string, history: string) -> string {
-  client GPT4o
-  prompt #"
-    {{ _.role('system') }}
-    You are continuing to answer a query using a Lua REPL environment. You will be queried iteratively until you provide a final answer.
-
-    IMPORTANT: Your response must be ONLY valid Lua code. Do NOT wrap your code in markdown code blocks (no ```lua or ```). Just output the raw Lua code directly.
-
-    Available in the Lua environment:
-    - `context` - variable containing information relevant to the query
-    - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars)
-    - `rlm.answer(value)` - return your final answer
-    - All variables from previous iterations are still available
-
-    Common patterns:
-    - Accumulate: table.insert(results, rlm.llm_query(...))
-    - Combine: table.concat(results, "\n")
-    - Synthesize: rlm.llm_query("Combine findings", combined)
-
-    {{ _.role('user') }}
-    Think step-by-step on what to do using the REPL environment to answer: "{{ query }}"
-
     The history below shows your previous REPL interactions:
-    {{ history }}
+    <repl_history>
+    {{ repl_history }}
+    </repl_history>
 
     Your next action:
   "#
 }
 
 // Final answer prompt
-function ReplFinalAnswer(query: string, history: string) -> string {
+function ReplFinalAnswer(query: string, repl_history: string) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
@@ -101,34 +77,23 @@ function ReplFinalAnswer(query: string, history: string) -> string {
 
     Available in the Lua environment:
     - `context` - variable containing information relevant to the query
-    - `rlm.answer(value)` - return your final answer
+    - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars)
+    - `print(value)` - output values for debugging
+    - `return value` - return your final answer (ends the session)
     - All variables from previous iterations are still available
 
     Example - synthesize accumulated results:
     local combined = table.concat(results, "\n\n")
-    return rlm.answer("Based on my analysis: " .. combined)
+    return "Based on my analysis: " .. combined
 
     {{ _.role('user') }}
     Based on all the information you have gathered from the REPL environment, provide your final answer to the query: "{{ query }}"
 
+    You MUST return your final answer now. Synthesize your findings into a coherent final answer using: return "your answer"
+
     Previous iterations:
-    {{ history }}
-
-    You MUST call return rlm.answer("your answer") now. Synthesize your findings into a coherent final answer.
-  "#
-}
-
-// Simpler function for recursive rlm.llm_query() calls
-function LlmQuery(query: string, context: string) -> string {
-  client GPT4o
-  prompt #"
-    {{ _.role('system') }}
-    You are a helpful assistant. Answer the query using the provided context. Be concise and focused.
-
-    {{ _.role('user') }}
-    Context:
-    {{ context }}
-
-    Query: {{ query }}
+    <repl_history>
+    {{ repl_history }}
+    </repl_history>
   "#
 }
