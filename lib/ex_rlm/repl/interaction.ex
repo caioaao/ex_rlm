@@ -4,7 +4,7 @@ defmodule ExRLM.Repl.Interaction do
   """
   defstruct [:kind, :content]
 
-  @truncation_length 1000
+  @truncation_length 100_000
 
   @type kind() :: :script | :output
 

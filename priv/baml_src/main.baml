@@ -32,10 +32,12 @@ function ReplCompletion(query: string, repl_history: string) -> string {
 
     The REPL environment is initialized with:
     - `context` - variable containing information relevant to your query
-    - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars)
+    - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars). Returns (result, error):
+      `result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) end`
     - `print(value)` - output values to see in the next iteration
     - `return value` - return your final answer (ends the session)
-    - All variables from previous iterations are still available
+    - GLOBAL variables persist across iterations (assign without `local`: `my_var = value`)
+    - LOCAL variables (`local x = ...`) are lost between iterations - avoid them for state you need to keep
 
     Use print() to output intermediate results for inspection. Use return to provide your final answer.
 
@@ -45,6 +47,12 @@ function ReplCompletion(query: string, repl_history: string) -> string {
     1. Direct query: Call rlm.llm_query() directly on the context if it fits
     2. Size-based chunking: Split context into fixed-size chunks using string.sub(), query each chunk, accumulate results in a table, then synthesize
     3. Header-based splitting: Use string.gmatch() to split by headers/sections, query each section, combine results
+
+    IMPORTANT - Chunking efficiency:
+    - Each rlm.llm_query() call consumes iteration budget - aim for 10-50 chunks maximum
+    - For 500K-10M contexts: use ~20 chunks of ~500K each
+    - For 10M+ contexts: use hierarchical summarization (summarize groups of chunks, then summarize summaries)
+    - Formula: chunk_size = math.ceil(#context / 20)
 
     Use Lua comments (-- comment) to explain your reasoning.
 
@@ -77,10 +85,12 @@ function ReplFinalAnswer(query: string, repl_history: string) -> string {
 
     Available in the Lua environment:
     - `context` - variable containing information relevant to the query
-    - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars)
+    - `rlm.llm_query(query, context)` - query a sub-LLM. Returns (result, error):
+      `local result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) end`
     - `print(value)` - output values for debugging
     - `return value` - return your final answer (ends the session)
-    - All variables from previous iterations are still available
+    - GLOBAL variables persist across iterations (assign without `local`: `my_var = value`)
+    - LOCAL variables (`local x = ...`) are lost between iterations
 
     Example - synthesize accumulated results:
     local combined = table.concat(results, "\n\n")

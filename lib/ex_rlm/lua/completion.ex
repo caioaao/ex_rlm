@@ -11,15 +11,19 @@ defmodule ExRLM.Lua.Completion do
   @doc """
   Lua-callable LLM query function.
 
-  Returns the completion result, or `[nil, error_message]` if max recursion
-  depth has been reached or context is too large.
+  Always returns a tuple `(result, error)`:
+  - On success: `(result, nil)`
+  - On error: `(nil, error_message)`
+
+  This consistent return format allows Lua code to always destructure:
+  `local result, err = rlm.llm_query(query, context)`
   """
   deflua llm_query(query, context), state do
     {:ok, completion} = Lua.get_private(state, :completion_fn)
 
     case completion.(query, context) do
       {:ok, result} ->
-        {[result], state}
+        {[result, nil], state}
 
       {:error, :max_depth_reached} ->
         {[nil, "max recursion depth reached"], state}

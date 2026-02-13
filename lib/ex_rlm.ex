@@ -29,7 +29,7 @@ defmodule ExRLM do
           | {:context, context()}
 
   @spec completion(t(), String.t(), keyword(completion_opt())) ::
-          {:ok, {String.t(), t()}} | {:error, term()}
+          {:ok, String.t()} | {:error, term()}
   def completion(rlm, query, opts \\ []) do
     Logger.info("Query: #{query}")
 
