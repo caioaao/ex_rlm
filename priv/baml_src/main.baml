@@ -39,14 +39,32 @@ function ReplCompletion(query: string, repl_history: string) -> string {
     - GLOBAL variables persist across iterations (assign without `local`: `my_var = value`)
     - LOCAL variables (`local x = ...`) are lost between iterations - avoid them for state you need to keep
 
+    IMPORTANT - Luerl limitations (this is an Erlang Lua implementation with restricted stdlib):
+    - string.gmatch() and string.gfind() DO NOT EXIST - use string.find() in a loop instead
+    - string.gsub() only works with string replacements, NOT replacement functions
+    - For pattern-based splitting, use string.find() + string.sub() in a loop
+
     Use print() to output intermediate results for inspection. Use return to provide your final answer.
 
-    Make sure to explicitly look through the context in the REPL before answering your query. An example strategy is to first look at the context and figure out a chunking strategy, then break up the context into chunks, query an LLM per chunk with a particular question and save the answers to a buffer, then query an LLM with all the buffers to produce your final answer.
+    Make sure to explicitly look through the context in the REPL before answering your query.
+
+    EFFICIENCY: Lua operations are instant and free, rlm.llm_query() calls are expensive.
+    Before calling rlm.llm_query(), try Lua string operations first:
+    - string.find(context, "pattern") to locate specific text (returns position or nil)
+    - string.sub(context, start, end_pos) to extract sections
+    - #context for size, string.lower() for case-insensitive matching
+    Only use rlm.llm_query() when you need LLM reasoning/synthesis that Lua cannot do.
 
     Strategies for handling large contexts:
     1. Direct query: Call rlm.llm_query() directly on the context if it fits
     2. Size-based chunking: Split context into fixed-size chunks using string.sub(), query each chunk, accumulate results in a table, then synthesize
-    3. Header-based splitting: Use string.gmatch() to split by headers/sections, query each section, combine results
+    3. Pattern-based splitting: Use string.find() in a loop to split by delimiters (e.g., "\n\n" or "\n#"):
+       sections = {}; pos = 1
+       while pos <= #context do
+         sep = string.find(context, "\n\n", pos)
+         if not sep then table.insert(sections, string.sub(context, pos)); break end
+         table.insert(sections, string.sub(context, pos, sep-1)); pos = sep + 2
+       end
 
     IMPORTANT - Chunking efficiency:
     - Each rlm.llm_query() call consumes iteration budget - aim for 10-50 chunks maximum
@@ -66,9 +84,7 @@ function ReplCompletion(query: string, repl_history: string) -> string {
     2. Based on structure, decide how to chunk and analyze
 
     The history below shows your previous REPL interactions:
-    <repl_history>
     {{ repl_history }}
-    </repl_history>
 
     Your next action:
   "#
@@ -102,8 +118,6 @@ function ReplFinalAnswer(query: string, repl_history: string) -> string {
     You MUST return your final answer now. Synthesize your findings into a coherent final answer using: return "your answer"
 
     Previous iterations:
-    <repl_history>
     {{ repl_history }}
-    </repl_history>
   "#
 }

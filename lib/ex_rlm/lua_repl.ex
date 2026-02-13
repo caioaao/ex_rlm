@@ -97,7 +97,7 @@ defmodule ExRLM.LuaRepl do
         # Instead of throwing the error, we simply add it to the Lua history,
         # and we also maintain the Lua state so the execution can continue.
         # This allows for the LLM to see the error but continue iterating.
-        repl = update_in(repl.history, &Repl.History.push(&1, :output, Exception.message(e)))
+        repl = update_in(repl.history, &Repl.History.push(&1, :output, inspect(e)))
         {:cont, repl}
     end
   end
