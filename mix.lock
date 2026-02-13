@@ -1,0 +1,7 @@
+%{
+  "baml_elixir": {:hex, :baml_elixir, "1.0.0-pre.24", "433b761739e9b86855cb697ffb7ad9477ccae3093486463d128ca4c0896de9d1", [:mix], [{:rustler, "~> 0.36.1", [hex: :rustler, repo: "hexpm", optional: true]}, {:rustler_precompiled, "~> 0.8", [hex: :rustler_precompiled, repo: "hexpm", optional: false]}], "hexpm", "f2eb74f1950e2148d8098c75f9eb80039ae45f37c23d45f01798e5899fcf4774"},
+  "castore": {:hex, :castore, "1.0.17", "4f9770d2d45fbd91dcf6bd404cf64e7e58fed04fadda0923dc32acca0badffa2", [:mix], [], "hexpm", "12d24b9d80b910dd3953e165636d68f147a31db945d2dcb9365e441f8b5351e5"},
+  "lua": {:hex, :lua, "0.4.0", "de0f04871fdd133cd13a0662690b4fd3ba7a73ca5857493c4665a0a4251908fe", [:mix], [{:luerl, "~> 1.5.1", [hex: :luerl, repo: "hexpm", optional: false]}], "hexpm", "648e17ab9faa1ab1a788fa58ed608366a7026d0eeaec2f311510c065817c4067"},
+  "luerl": {:hex, :luerl, "1.5.1", "f6700420950fc6889137e7a0c11c4a8467dea04a8c23f707a40d83566d14e786", [:rebar3], [], "hexpm", "abf88d849baa0d5dca93b245a8688d4de2ee3d588159bb2faf51e15946509390"},
+  "rustler_precompiled": {:hex, :rustler_precompiled, "0.8.4", "700a878312acfac79fb6c572bb8b57f5aae05fe1cf70d34b5974850bbf2c05bf", [:mix], [{:castore, "~> 0.1 or ~> 1.0", [hex: :castore, repo: "hexpm", optional: false]}, {:rustler, "~> 0.23", [hex: :rustler, repo: "hexpm", optional: true]}], "hexpm", "3b33d99b540b15f142ba47944f7a163a25069f6d608783c321029bc1ffb09514"},
+}
