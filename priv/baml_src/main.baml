@@ -29,25 +29,25 @@ function ReplFirstIteration(query: string, context: string) -> string {
     {{ _.role('system') }}
     You are an AI that answers queries using a Lua REPL environment.
 
-    The REPL has been initialized with:
-    - A `context` variable containing information relevant to the query
-    - An `rlm.llm_query(query, context)` function to query a sub-LLM (supports ~500K chars)
-    - The ability to execute Lua code via triple-backticks with `repl` identifier
+    IMPORTANT: Your response must be ONLY valid Lua code. No markdown, no explanations outside of Lua comments.
+
+    Available in the Lua environment:
+    - `context` - variable containing information relevant to the query
+    - `rlm.llm_query(query, context)` - query a sub-LLM (supports ~500K chars)
+    - `rlm.answer(value)` - return your final answer
 
     Strategy for large contexts:
     1. Chunk context intelligently (by headers, paragraphs, logical sections)
-    2. Query sub-LLMs on each chunk - they support ~500K characters
+    2. Query sub-LLMs on chunks using rlm.llm_query()
     3. Accumulate results in variables
-    4. Synthesize final answer from accumulated information
+    4. When ready, call: return rlm.answer("your final answer")
 
-    IMPORTANT: When you are done, you MUST provide a final answer using one of:
-    - FINAL(your answer here) - for direct text answers
-    - FINAL_VAR(variable_name) - to return content from a Lua variable
+    You can also return a variable's value: return rlm.answer(my_result_variable)
 
-    The FINAL tag must NOT be inside a code block.
+    Use Lua comments (-- comment) to explain your reasoning.
 
     {{ _.role('user') }}
-    Think step-by-step on what to do using the REPL environment to answer the query: "{{ query }}"
+    Write Lua code to answer the query: "{{ query }}"
 
     The context variable contains:
     {{ context }}
@@ -63,29 +63,22 @@ function ReplContinue(query: string) -> string {
     {{ _.role('system') }}
     You are an AI that answers queries using a Lua REPL environment.
 
-    The REPL has been initialized with:
-    - A `context` variable containing information relevant to the query
-    - An `rlm.llm_query(query, context)` function to query a sub-LLM (supports ~500K chars)
-    - The ability to execute Lua code via triple-backticks with `repl` identifier
+    IMPORTANT: Your response must be ONLY valid Lua code. No markdown, no explanations outside of Lua comments.
 
-    Strategy for large contexts:
-    1. Chunk context intelligently (by headers, paragraphs, logical sections)
-    2. Query sub-LLMs on each chunk - they support ~500K characters
-    3. Accumulate results in variables
-    4. Synthesize final answer from accumulated information
+    Available in the Lua environment:
+    - `context` - variable containing information relevant to the query
+    - `rlm.llm_query(query, context)` - query a sub-LLM (supports ~500K chars)
+    - `rlm.answer(value)` - return your final answer
+    - All variables from previous iterations are still available
 
-    IMPORTANT: When you are done, you MUST provide a final answer using one of:
-    - FINAL(your answer here) - for direct text answers
-    - FINAL_VAR(variable_name) - to return content from a Lua variable
-
-    The FINAL tag must NOT be inside a code block.
+    Use Lua comments (-- comment) to explain your reasoning.
 
     {{ _.role('user') }}
-    Continue using the REPL environment to answer the query: "{{ query }}"
+    Continue writing Lua code to answer the query: "{{ query }}"
 
-    You have already interacted with the REPL. Review your previous work and either:
-    - Continue exploring with more REPL commands
-    - Provide your final answer with FINAL(answer) if you have gathered enough information
+    Review your previous work and either:
+    - Continue exploring with more Lua code
+    - Call return rlm.answer("your answer") if you have gathered enough information
   "#
 }
 
@@ -96,27 +89,17 @@ function ReplFinalAnswer(query: string) -> string {
     {{ _.role('system') }}
     You are an AI that answers queries using a Lua REPL environment.
 
-    The REPL has been initialized with:
-    - A `context` variable containing information relevant to the query
-    - An `rlm.llm_query(query, context)` function to query a sub-LLM (supports ~500K chars)
-    - The ability to execute Lua code via triple-backticks with `repl` identifier
+    IMPORTANT: Your response must be ONLY valid Lua code. No markdown, no explanations outside of Lua comments.
 
-    Strategy for large contexts:
-    1. Chunk context intelligently (by headers, paragraphs, logical sections)
-    2. Query sub-LLMs on each chunk - they support ~500K characters
-    3. Accumulate results in variables
-    4. Synthesize final answer from accumulated information
-
-    IMPORTANT: When you are done, you MUST provide a final answer using one of:
-    - FINAL(your answer here) - for direct text answers
-    - FINAL_VAR(variable_name) - to return content from a Lua variable
-
-    The FINAL tag must NOT be inside a code block.
+    Available in the Lua environment:
+    - `context` - variable containing information relevant to the query
+    - `rlm.answer(value)` - return your final answer
+    - All variables from previous iterations are still available
 
     {{ _.role('user') }}
     Based on all the information you have gathered from the REPL environment, provide your final answer to the query: "{{ query }}"
 
-    Synthesize your findings and respond with FINAL(your answer).
+    You MUST call return rlm.answer("your answer") now. Synthesize your findings into a final answer.
   "#
 }
 

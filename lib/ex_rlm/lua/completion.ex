@@ -1,13 +1,28 @@
 defmodule ExRLM.Lua.Completion do
   @moduledoc """
-  Defines the Lua API for recursively calling the completion API.
+  Defines the Lua API for the REPL environment.
 
-  This module registers Lua functions that the LLM can call to perform
-  recursive completions. The function is available in Lua as
-  `rlm.llm_query(query, context)`.
+  This module registers Lua functions that the LLM can call:
+  - `rlm.llm_query(query, context)` - perform recursive LLM completions
+  - `rlm.answer(value)` - signal the final answer
   """
 
   use Lua.API, scope: "rlm"
+
+  @doc """
+  Signals the final answer from the REPL.
+
+  Returns two values: a sentinel marker `"__rlm_final_answer__"` and the answer value.
+  The REPL uses this to detect when the LLM has provided its final answer.
+
+  ## Example
+
+      return rlm.answer("The answer is 42")
+      return rlm.answer(my_result_variable)
+  """
+  deflua answer(value), state do
+    {["__rlm_final_answer__", value], state}
+  end
 
   @doc """
   Lua-callable LLM query function.

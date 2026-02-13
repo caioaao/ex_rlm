@@ -17,6 +17,55 @@ defmodule ExRLMTest do
   end
 end
 
+defmodule ExRLM.LuaAnswerTest do
+  use ExUnit.Case
+
+  test "rlm.answer returns sentinel value with string" do
+    lua = ExRLM.Lua.new(model: "test", max_depth: 1, completion_fn: fn _, _, _ -> "" end)
+
+    {result, _lua} = Lua.eval!(lua, ~s[return rlm.answer("The answer is 42")])
+
+    assert result == ["__rlm_final_answer__", "The answer is 42"]
+  end
+
+  test "rlm.answer returns sentinel value with variable" do
+    lua = ExRLM.Lua.new(model: "test", max_depth: 1, completion_fn: fn _, _, _ -> "" end)
+
+    {result, _lua} =
+      Lua.eval!(lua, """
+        my_result = "computed value"
+        return rlm.answer(my_result)
+      """)
+
+    assert result == ["__rlm_final_answer__", "computed value"]
+  end
+
+  test "rlm.answer returns sentinel value with number" do
+    lua = ExRLM.Lua.new(model: "test", max_depth: 1, completion_fn: fn _, _, _ -> "" end)
+
+    {result, _lua} = Lua.eval!(lua, "return rlm.answer(42)")
+
+    assert result == ["__rlm_final_answer__", 42.0]
+  end
+
+  test "rlm.answer returns sentinel value with nil" do
+    lua = ExRLM.Lua.new(model: "test", max_depth: 1, completion_fn: fn _, _, _ -> "" end)
+
+    {result, _lua} = Lua.eval!(lua, "return rlm.answer(nil)")
+
+    assert result == ["__rlm_final_answer__", nil]
+  end
+
+  test "rlm.answer works with table values" do
+    lua = ExRLM.Lua.new(model: "test", max_depth: 1, completion_fn: fn _, _, _ -> "" end)
+
+    {result, _lua} = Lua.eval!(lua, ~s[return rlm.answer({a = 1, b = 2})])
+
+    assert ["__rlm_final_answer__", table] = result
+    assert is_list(table)
+  end
+end
+
 defmodule ExRLM.LuaCompletionTest do
   use ExUnit.Case
 

@@ -1,10 +1,12 @@
 defmodule ExRLM.Repl do
   @moduledoc """
   Responsible for instantiating the Lua engine, setting up the context, and querying the LLM.
+
+  LLM responses are evaluated directly as Lua code. Final answers are detected via
+  the sentinel value returned by `rlm.answer(value)`.
   """
 
   alias ExRLM.LLM
-  alias ExRLM.Repl.Parser
 
   defstruct [:lua_state, :model, :recursive_model, :max_iterations, :max_depth]
 
@@ -80,104 +82,66 @@ defmodule ExRLM.Repl do
   # Max iterations reached - force final answer
   defp iterate(repl, query, context, _iteration, _consecutive_errors) do
     with {:ok, response} <- LLM.repl_completion(query, context, 0, true, repl.model) do
-      case Parser.parse_response(response) do
-        {:final_text, text} ->
-          {:ok, {repl, text}}
+      case execute_response(repl.lua_state, response) do
+        {:final_answer, answer, new_lua_state} ->
+          {:ok, {%{repl | lua_state: new_lua_state}, answer}}
 
-        {:final_var, var} ->
-          resolve_final_var(repl, var)
+        {:continue, result, _new_lua_state} ->
+          # If LLM still doesn't provide rlm.answer(), return the result
+          {:ok, {repl, result}}
 
-        _ ->
-          # If LLM still doesn't provide FINAL, return raw response
+        {:error, _error_msg, _lua_state} ->
+          # If there's a Lua error, return raw response
           {:ok, {repl, response}}
       end
     end
   end
 
   defp process_response(repl, query, response, context, iteration, consecutive_errors) do
-    case Parser.parse_response(response) do
-      {:final_text, text} ->
-        {:ok, {repl, text}}
+    case execute_response(repl.lua_state, response) do
+      {:final_answer, answer, new_lua_state} ->
+        {:ok, {%{repl | lua_state: new_lua_state}, answer}}
 
-      {:final_var, var} ->
-        resolve_final_var(repl, var)
+      {:continue, result, new_lua_state} ->
+        new_context = append_to_context(context, iteration, response, result)
+        new_repl = %{repl | lua_state: new_lua_state}
+        iterate(new_repl, query, new_context, iteration + 1, 0)
 
-      {:code_blocks, blocks, remaining_text} ->
-        case execute_code_blocks(repl, blocks, iteration) do
-          {:ok, results, new_repl} ->
-            new_context = append_to_context(context, iteration, blocks, results, remaining_text)
-            iterate(new_repl, query, new_context, iteration + 1, 0)
-
-          {:error, error_msg, new_repl} ->
-            new_context = append_error_to_context(context, iteration, error_msg)
-            iterate(new_repl, query, new_context, iteration + 1, consecutive_errors + 1)
-        end
-
-      {:continue, text} ->
-        new_context = context <> "\n\n--- Iteration #{iteration} ---\n" <> text
-        iterate(repl, query, new_context, iteration + 1, 0)
+      {:error, error_msg, lua_state} ->
+        new_context = append_error_to_context(context, iteration, response, error_msg)
+        new_repl = %{repl | lua_state: lua_state}
+        iterate(new_repl, query, new_context, iteration + 1, consecutive_errors + 1)
     end
   end
 
-  defp execute_code_blocks(repl, blocks, _iteration) do
-    Enum.reduce_while(blocks, {:ok, [], repl}, fn code, {:ok, results, current_repl} ->
-      case execute_code_block(current_repl.lua_state, code) do
-        {:ok, result, new_lua_state} ->
-          new_repl = %{current_repl | lua_state: new_lua_state}
-          {:cont, {:ok, results ++ [{code, {:ok, result}}], new_repl}}
-
-        {:error, error_msg, lua_state} ->
-          new_repl = %{current_repl | lua_state: lua_state}
-          {:halt, {:error, error_msg, new_repl}}
-      end
-    end)
-  end
-
-  defp execute_code_block(lua_state, code) do
+  defp execute_response(lua_state, response) do
     try do
-      {results, new_state} = Lua.eval!(lua_state, code)
-      {:ok, results, new_state}
+      case Lua.eval!(lua_state, response) do
+        {["__rlm_final_answer__", answer], new_state} ->
+          {:final_answer, format_result(answer), new_state}
+
+        {result, new_state} ->
+          {:continue, format_result(result), new_state}
+      end
     rescue
       e in [Lua.RuntimeException, Lua.CompilerException] ->
         {:error, Exception.message(e), lua_state}
     end
   end
 
-  defp resolve_final_var(repl, var) do
-    try do
-      value = Lua.get!(repl.lua_state, [String.to_atom(var)])
-      {:ok, {repl, format_result(value)}}
-    rescue
-      _ -> {:error, {:final_var_not_found, var}}
-    end
-  end
-
-  defp append_to_context(context, iteration, blocks, results, remaining_text) do
-    code_results =
-      Enum.zip(blocks, results)
-      |> Enum.map(fn {code, {_code, {:ok, result}}} ->
-        """
-        Code:
-        ```lua
-        #{String.trim(code)}
-        ```
-        Result: #{format_result(result)}
-        """
-      end)
-      |> Enum.join("\n")
-
+  defp append_to_context(context, iteration, response, result) do
     context <>
       "\n\n--- Iteration #{iteration} ---\n" <>
-      remaining_text <>
-      "\n" <>
-      code_results
+      "Code:\n```lua\n#{String.trim(response)}\n```\n" <>
+      "Result: #{result}"
   end
 
-  defp append_error_to_context(context, iteration, error_msg) do
+  defp append_error_to_context(context, iteration, response, error_msg) do
     context <>
       "\n\n--- Iteration #{iteration} ---\n" <>
-      "Error executing Lua code: #{error_msg}\n" <>
-      "Please fix the error and try again."
+      "Code:\n```lua\n#{String.trim(response)}\n```\n" <>
+      "Error: #{error_msg}\n" <>
+      "Please fix the Lua syntax error and try again."
   end
 
   defp format_result(nil), do: "nil"
