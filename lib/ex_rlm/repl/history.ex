@@ -44,7 +44,7 @@ defmodule ExRLM.Repl.History do
   defp maybe_trunc(content) do
     if String.length(content) > @truncation_length do
       {content, _} = String.split_at(content, @truncation_length)
-      [content, "..."]
+      content <> "..."
     else
       content
     end

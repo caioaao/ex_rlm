@@ -33,7 +33,7 @@ function ReplCompletion(query: string, repl_history: string) -> string {
     The REPL environment is initialized with:
     - `context` - variable containing information relevant to your query
     - `rlm.llm_query(query, context)` - query a sub-LLM (can handle ~500K chars). Returns (result, error):
-      `result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) end`
+      `result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) elseif result then return result end`
     - `print(value)` - output values to see in the next iteration
     - `return value` - return your final answer (ends the session)
     - GLOBAL variables persist across iterations (assign without `local`: `my_var = value`)
@@ -48,14 +48,25 @@ function ReplCompletion(query: string, repl_history: string) -> string {
 
     Make sure to explicitly look through the context in the REPL before answering your query.
 
-    EFFICIENCY: Lua operations are instant and free, rlm.llm_query() calls are expensive.
-    Before calling rlm.llm_query(), try Lua string operations first:
-    - string.find(context, "pattern") to locate specific text (returns position or nil)
-    - string.sub(context, start, end_pos) to extract sections
-    - #context for size, string.lower() for case-insensitive matching
-    Only use rlm.llm_query() when you need LLM reasoning/synthesis that Lua cannot do.
+    LEVERAGE LUA: Lua operations are instant and free, even on 100MB+ contexts.
 
-    Strategies for handling large contexts:
+    Available Lua stdlib for exploration:
+    - #context → size in bytes
+    - string.sub(s, start, end) → extract substring (1-indexed, end is inclusive)
+    - string.find(s, pattern) → returns start_pos, end_pos or nil
+    - string.find(s, pattern, init) → search starting from position init
+    - string.lower(s) / string.upper(s) → case conversion
+    - string.match(s, pattern) → returns captured text or nil
+    - string.rep(s, n) → repeat string n times
+    - string.reverse(s) → reverse a string
+    - string.len(s) → same as #s
+    - tonumber(s) / tostring(n) → type conversions
+    - math.min(), math.max(), math.floor(), math.ceil() → numeric operations
+    - table.insert(t, v), table.concat(t, sep), #table → table operations
+
+    Use rlm.llm_query() only when you need LLM reasoning/synthesis that Lua cannot do.
+
+    When you need LLM analysis on large contexts (chunking strategies):
     1. Direct query: Call rlm.llm_query() directly on the context if it fits
     2. Size-based chunking: Split context into fixed-size chunks using string.sub(), query each chunk, accumulate results in a table, then synthesize
     3. Pattern-based splitting: Use string.find() in a loop to split by delimiters (e.g., "\n\n" or "\n#"):
@@ -77,11 +88,15 @@ function ReplCompletion(query: string, repl_history: string) -> string {
     {{ _.role('user') }}
     IMPORTANT: Do not provide a final answer until you have sufficiently explored the context.
 
-    Think step-by-step on what to do using the REPL environment to answer: "{{ query }}"
+    Think step-by-step using the REPL environment to answer: "{{ query }}"
 
-    The context is available in the `context` Lua variable. Start by exploring it:
-    1. Check size: #context
-    2. Based on structure, decide how to chunk and analyze
+    The context is in the `context` variable. Explore it with Lua before deciding how to proceed:
+    - Check size: #context
+    - Sample content: string.sub(context, 1, 500) or string.sub(context, #context-500, #context)
+    - Search for patterns: string.find(context, "keyword")
+    - Look at structure: Are there delimiters? Headers? JSON? Line-based?
+
+    Lua operations are instant and free - use them to understand what you're working with.
 
     The history below shows your previous REPL interactions:
     {{ repl_history }}
@@ -102,7 +117,7 @@ function ReplFinalAnswer(query: string, repl_history: string) -> string {
     Available in the Lua environment:
     - `context` - variable containing information relevant to the query
     - `rlm.llm_query(query, context)` - query a sub-LLM. Returns (result, error):
-      `local result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) end`
+      `result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) elseif result then return result end`
     - `print(value)` - output values for debugging
     - `return value` - return your final answer (ends the session)
     - GLOBAL variables persist across iterations (assign without `local`: `my_var = value`)
