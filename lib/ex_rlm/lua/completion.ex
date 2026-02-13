@@ -28,21 +28,36 @@ defmodule ExRLM.Lua.Completion do
   Lua-callable LLM query function.
 
   Returns the completion result, or `[nil, error_message]` if max recursion
-  depth has been reached.
+  depth has been reached or context is too large.
   """
   deflua llm_query(query, context), state do
     {:ok, config} = Lua.get_private(state, :rlm_config)
 
-    if config.max_depth <= 0 do
-      {[nil, "max recursion depth reached"], state}
-    else
-      # Decrement depth for recursive call
-      new_config = %{config | max_depth: config.max_depth - 1}
-      new_state = Lua.put_private(state, :rlm_config, new_config)
+    query_len = String.length(query || "")
+    context_len = String.length(context || "")
+    total_len = query_len + context_len
+    max_chars = config.max_context_chars
 
-      # Call the completion function
-      result = config.completion_fn.(query, context, new_config)
-      {[result], new_state}
+    cond do
+      config.max_depth <= 0 ->
+        {[nil, "max recursion depth reached"], state}
+
+      total_len > max_chars ->
+        suggested = div(max_chars, 2)
+
+        {[
+           nil,
+           "context too large: #{total_len} chars (query: #{query_len}, context: #{context_len}), limit is #{max_chars}. Split into chunks of ~#{suggested} chars and call rlm.llm_query() on each"
+         ], state}
+
+      true ->
+        # Decrement depth for recursive call
+        new_config = %{config | max_depth: config.max_depth - 1}
+        new_state = Lua.put_private(state, :rlm_config, new_config)
+
+        # Call the completion function
+        result = config.completion_fn.(query, context, new_config)
+        {[result], new_state}
     end
   end
 end

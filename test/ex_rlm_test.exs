@@ -120,4 +120,82 @@ defmodule ExRLM.LuaCompletionTest do
 
     assert_received {:context_check, "my query", "detailed context here"}
   end
+
+  test "returns error when context exceeds max_context_chars" do
+    completion_fn = fn _q, _c, _config -> "should not be called" end
+
+    lua =
+      ExRLM.Lua.new(
+        model: "test",
+        max_depth: 5,
+        max_context_chars: 100,
+        completion_fn: completion_fn
+      )
+
+    # Create context that exceeds the limit
+    large_context = String.duplicate("x", 150)
+
+    {[result, err], _lua} =
+      Lua.eval!(lua, """
+        return rlm.llm_query("query", "#{large_context}")
+      """)
+
+    assert result == nil
+    assert err =~ "context too large"
+    assert err =~ "limit is 100"
+    assert err =~ "Split into chunks"
+  end
+
+  test "succeeds when context is within max_context_chars" do
+    test_pid = self()
+
+    completion_fn = fn query, context, _config ->
+      send(test_pid, {:called, query, context})
+      "success"
+    end
+
+    lua =
+      ExRLM.Lua.new(
+        model: "test",
+        max_depth: 5,
+        max_context_chars: 100,
+        completion_fn: completion_fn
+      )
+
+    {[result], _lua} =
+      Lua.eval!(lua, """
+        return rlm.llm_query("q", "small context")
+      """)
+
+    assert result == "success"
+    assert_received {:called, "q", "small context"}
+  end
+
+  test "error message includes actual size and suggested chunk size" do
+    completion_fn = fn _q, _c, _config -> "should not be called" end
+
+    lua =
+      ExRLM.Lua.new(
+        model: "test",
+        max_depth: 5,
+        max_context_chars: 1000,
+        completion_fn: completion_fn
+      )
+
+    # Query of 100 chars + context of 1000 chars = 1100 total
+    query = String.duplicate("q", 100)
+    context = String.duplicate("c", 1000)
+
+    {[result, err], _lua} =
+      Lua.eval!(lua, """
+        return rlm.llm_query("#{query}", "#{context}")
+      """)
+
+    assert result == nil
+    assert err =~ "1100 chars"
+    assert err =~ "query: 100"
+    assert err =~ "context: 1000"
+    assert err =~ "limit is 1000"
+    assert err =~ "~500 chars"
+  end
 end

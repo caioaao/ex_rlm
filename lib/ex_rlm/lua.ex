@@ -61,6 +61,7 @@ defmodule ExRLM.Lua do
       model: Keyword.fetch!(opts, :model),
       max_iterations: Keyword.get(opts, :max_iterations, 10),
       max_depth: Keyword.get(opts, :max_depth, 10),
+      max_context_chars: Keyword.get(opts, :max_context_chars, 300_000),
       completion_fn: Keyword.get(opts, :completion_fn, &default_completion/3)
     }
 
