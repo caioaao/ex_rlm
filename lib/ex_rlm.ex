@@ -2,6 +2,8 @@ defmodule ExRLM do
   @moduledoc """
   An Elixir implementation of the RLM inference strategy using a Lua engine.
   """
+  require Logger
+
   alias ExRLM.LLM
   alias ExRLM.Repl
 
@@ -29,6 +31,8 @@ defmodule ExRLM do
   @spec completion(t(), String.t(), keyword(completion_opt())) ::
           {:ok, {String.t(), t()}} | {:error, term()}
   def completion(rlm, query, opts \\ []) do
+    Logger.info("Query: #{query}")
+
     context = Keyword.get(opts, :context, "")
     max_depth = Keyword.get(opts, :max_depth, 10)
     max_iterations = Keyword.get(opts, :max_iterations, 10)
@@ -61,11 +65,25 @@ defmodule ExRLM do
 
   defp iterate(rlm, repl, query, context, iteration) do
     with {:ok, source_code} <- call_llm(rlm, repl, query, iteration) do
+      Logger.info("[Iteration #{iteration}] Script:\n#{source_code}")
+
       ExRLM.LuaRepl.eval(repl, source_code)
       |> case do
-        {:halt, final_answer} -> {:ok, final_answer}
-        {:cont, repl} -> iterate(rlm, repl, query, context, iteration - 1)
+        {:halt, final_answer} ->
+          Logger.info("[Iteration #{iteration}] Final answer: #{final_answer}")
+          {:ok, final_answer}
+
+        {:cont, repl} ->
+          Logger.info("[Iteration #{iteration}] Output:\n#{last_output(repl)}")
+          iterate(rlm, repl, query, context, iteration - 1)
       end
+    end
+  end
+
+  defp last_output(repl) do
+    case hd(repl.history) do
+      %Repl.Interaction{kind: :output, content: content} -> content
+      _ -> ""
     end
   end
 

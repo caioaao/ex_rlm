@@ -1,8 +1,6 @@
 defmodule ExRLM.LuaRepl do
   alias ExRLM.Repl
 
-  require Logger
-
   defstruct [:lua, :history]
 
   @type t() :: %__MODULE__{
@@ -69,10 +67,6 @@ defmodule ExRLM.LuaRepl do
           | {:cont, t()}
           | {:error, term()}
   def eval(repl, script) do
-    Logger.metadata(lua_repl: inspect(repl), lua_script: script)
-
-    Logger.debug("Evaluating lua script")
-
     repl = update_in(repl.history, &Repl.History.push(&1, :script, script))
 
     # Clear output buffer before eval
@@ -87,8 +81,6 @@ defmodule ExRLM.LuaRepl do
 
           repl = put_in(repl.lua, lua)
           repl = update_in(repl.history, &Repl.History.push(&1, :output, output))
-
-          Logger.debug("Evaluated lua script", lua_repl: inspect(repl), output: output)
 
           {:cont, repl}
 
@@ -106,7 +98,6 @@ defmodule ExRLM.LuaRepl do
         # and we also maintain the Lua state so the execution can continue.
         # This allows for the LLM to see the error but continue iterating.
         repl = update_in(repl.history, &Repl.History.push(&1, :output, Exception.message(e)))
-        Logger.info("Lua exception detected", lua_exception: inspect(e), lua_repl: inspect(repl))
         {:cont, repl}
     end
   end
