@@ -4,12 +4,6 @@ defmodule ExRLM.Repl.HistoryTest do
   alias ExRLM.Repl.History
   alias ExRLM.Repl.Interaction
 
-  describe inspect(&History.new/0) do
-    test "returns empty list" do
-      assert History.new() == []
-    end
-  end
-
   describe inspect(&History.push/3) do
     test "prepends interaction to history" do
       history = History.new()
@@ -50,34 +44,41 @@ defmodule ExRLM.Repl.HistoryTest do
       history = [%Interaction{kind: :script, content: "print(1)"}]
       result = History.format(history)
 
-      assert result =~ "<code lang=\"lua\">"
-      assert result =~ "</code>"
-      assert result =~ "print(1)"
+      assert result == """
+             <repl_history>
+               <code lang="lua">
+                 print(1)
+               </code>
+             </repl_history>\
+             """
     end
 
     test "outputs wrapped in output tags" do
       history = [%Interaction{kind: :output, content: "hello world"}]
       result = History.format(history)
 
-      assert result =~ "<output>"
-      assert result =~ "</output>"
-      assert result =~ "hello world"
-    end
-
-    test "content properly indented with 4 spaces" do
-      history = [%Interaction{kind: :script, content: "x = 1"}]
-      result = History.format(history)
-
-      assert result =~ "    x = 1"
+      assert result == """
+             <repl_history>
+               <output>
+                 hello world
+               </output>
+             </repl_history>\
+             """
     end
 
     test "multi-line content indented on each line" do
       history = [%Interaction{kind: :script, content: "x = 1\ny = 2\nz = 3"}]
       result = History.format(history)
 
-      assert result =~ "    x = 1\n"
-      assert result =~ "    y = 2\n"
-      assert result =~ "    z = 3\n"
+      assert result == """
+             <repl_history>
+               <code lang="lua">
+                 x = 1
+                 y = 2
+                 z = 3
+               </code>
+             </repl_history>\
+             """
     end
 
     test "history reversed to chronological order" do
