@@ -14,7 +14,7 @@ Add ExRLM to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ex_rlm, "~> 0.1.0"}
+    {:ex_rlm, git: "https://github.com/caioaao/ex_rlm", ref: "main"}
   ]
 end
 ```
