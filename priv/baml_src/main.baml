@@ -22,11 +22,18 @@ client<llm> GPT4Turbo {
   }
 }
 
-function ReplCompletion(query: string, repl_history: string) -> string {
+function ReplCompletion(query: string, repl_history: string, remaining: int) -> string {
   client GPT4o
   prompt #"
     {{ _.role('system') }}
     You are tasked with answering a query with associated context. You can access, transform, and analyze this context in a Lua REPL environment that can recursively query sub-LLMs. You will be queried iteratively until you provide a final answer.
+
+    COST MODEL:
+    - Lua execution: instant, no cost (even on 100MB+ contexts)
+    - LLM roundtrip (generating this response): expensive, limited budget
+    - rlm.llm_query(): spawns a subtree of agents (expensive in tokens/latency), uses depth budget (not roundtrips)
+    - You have {{ remaining }} roundtrips remaining
+    - Goal: Maximize Lua work per roundtrip; use rlm.llm_query() judiciously for synthesis tasks
 
     IMPORTANT: Your response must be ONLY valid Lua code. Do NOT wrap your code in markdown code blocks (no ```lua or ```). Just output the raw Lua code directly.
 
@@ -36,13 +43,14 @@ function ReplCompletion(query: string, repl_history: string) -> string {
       `result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) elseif result then return result end`
     - `print(value)` - output values to see in the next iteration
     - `return value` - return your final answer (ends the session)
-    - GLOBAL variables persist across iterations (assign without `local`: `my_var = value`)
-    - LOCAL variables (`local x = ...`) are lost between iterations - avoid them for state you need to keep
+    - GLOBAL variables persist across roundtrips (assign without `local`: `my_var = value`)
+    - LOCAL variables (`local x = ...`) are lost between roundtrips - avoid them for state you need to keep
 
     IMPORTANT - Luerl limitations (this is an Erlang Lua implementation with restricted stdlib):
     - string.gmatch() and string.gfind() DO NOT EXIST - use string.find() in a loop instead
     - string.gsub() only works with string replacements, NOT replacement functions
     - For pattern-based splitting, use string.find() + string.sub() in a loop
+    - Reserved keywords (end, if, then, etc.) cannot be used as unquoted table keys - use ["end"] or rename
 
     Use print() to output intermediate results for inspection. Use return to provide your final answer.
 
@@ -78,7 +86,8 @@ function ReplCompletion(query: string, repl_history: string) -> string {
        end
 
     IMPORTANT - Chunking efficiency:
-    - Each rlm.llm_query() call consumes iteration budget - aim for 10-50 chunks maximum
+    - rlm.llm_query() spawns a subtree of agents (expensive in tokens/latency) but doesn't consume your roundtrip budget
+    - Aim for 10-50 chunks maximum to keep sub-query costs reasonable
     - For 500K-10M contexts: use ~20 chunks of ~500K each
     - For 10M+ contexts: use hierarchical summarization (summarize groups of chunks, then summarize summaries)
     - Formula: chunk_size = math.ceil(#context / 20)
@@ -88,17 +97,25 @@ function ReplCompletion(query: string, repl_history: string) -> string {
     {{ _.role('user') }}
     IMPORTANT: Do not provide a final answer until you have sufficiently explored the context.
 
-    Think step-by-step using the REPL environment to answer: "{{ query }}"
+    Plan your exploration, then execute multiple operations in one Lua block to answer: "{{ query }}"
 
-    The context is in the `context` variable. Explore it with Lua before deciding how to proceed:
-    - Check size: #context
-    - Sample content: string.sub(context, 1, 500) or string.sub(context, #context-500, #context)
-    - Search for patterns: string.find(context, "keyword")
-    - Look at structure: Are there delimiters? Headers? JSON? Line-based?
+    BATCH YOUR EXPLORATION: The context is in the `context` variable. Combine multiple operations in one Lua block:
 
-    Lua operations are instant and free - use them to understand what you're working with.
+    -- ANTI-PATTERN (wastes 3 roundtrips):
+    -- Roundtrip 1: size = #context; print(size)
+    -- Roundtrip 2: preview = string.sub(context, 1, 500); print(preview)
+    -- Roundtrip 3: string.find(context, "keyword")
 
-    The history below shows your previous REPL interactions:
+    -- EFFICIENT (1 roundtrip):
+    size = #context
+    head = string.sub(context, 1, 500)
+    tail = string.sub(context, #context - 500)
+    pos = string.find(context, "important")
+    print("Size:", size, "| Keyword at:", pos or "not found")
+    print("Head:", head)
+    print("Tail:", tail)
+
+    The history below shows your previous roundtrips:
     {{ repl_history }}
 
     Your next action:
@@ -120,8 +137,8 @@ function ReplFinalAnswer(query: string, repl_history: string) -> string {
       `result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) elseif result then return result end`
     - `print(value)` - output values for debugging
     - `return value` - return your final answer (ends the session)
-    - GLOBAL variables persist across iterations (assign without `local`: `my_var = value`)
-    - LOCAL variables (`local x = ...`) are lost between iterations
+    - GLOBAL variables persist across roundtrips (assign without `local`: `my_var = value`)
+    - LOCAL variables (`local x = ...`) are lost between roundtrips
 
     Example - synthesize accumulated results:
     local combined = table.concat(results, "\n\n")
@@ -132,7 +149,7 @@ function ReplFinalAnswer(query: string, repl_history: string) -> string {
 
     You MUST return your final answer now. Synthesize your findings into a coherent final answer using: return "your answer"
 
-    Previous iterations:
+    Previous roundtrips:
     {{ repl_history }}
   "#
 }

@@ -92,7 +92,10 @@ defmodule ExRLM do
     model = rlm.config.model
 
     if iteration > 1 do
-      LLM.ReplCompletion.call(%{query: query, repl_history: repl_history}, %{llm_client: model})
+      LLM.ReplCompletion.call(
+        %{query: query, repl_history: repl_history, remaining: iteration},
+        %{llm_client: model}
+      )
     else
       LLM.ReplFinalAnswer.call(%{query: query, repl_history: repl_history}, %{llm_client: model})
     end
