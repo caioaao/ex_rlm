@@ -103,6 +103,10 @@ defmodule ExRLM.LuaRepl do
 
   @sandbox @library_default_sandbox ++ @additional_sandbox
 
+  @typep completion_fn() :: (query :: String.t(), context :: String.t() ->
+                               {:ok, String.t()} | {:error, term()})
+
+  @spec new(completion_fn :: completion_fn(), context :: list(String.t())) :: t()
   def new(completion_fn, context) do
     lua =
       Lua.new(sandboxed: @sandbox)
