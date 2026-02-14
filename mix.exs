@@ -26,9 +26,9 @@ defmodule ExRLM.MixProject do
       main: "readme",
       extras: [
         "README.md",
-        "doc/tutorials/getting-started.md",
-        "doc/guides/custom-llm-providers.md",
-        "doc/explanation/how-rlm-works.md"
+        "docs/tutorials/getting-started.md",
+        "docs/guides/custom-llm-providers.md",
+        "docs/explanation/how-rlm-works.md"
       ],
       groups_for_modules: [
         "Public API": [ExRLM, ExRLM.LLM],
@@ -36,9 +36,9 @@ defmodule ExRLM.MixProject do
         "LLM Providers": [ExRLM.Completion.OpenAI]
       ],
       groups_for_extras: [
-        Tutorials: ["doc/tutorials/getting-started.md"],
-        Guides: ["doc/guides/custom-llm-providers.md"],
-        Explanation: ["doc/explanation/how-rlm-works.md"]
+        Tutorials: ["docs/tutorials/getting-started.md"],
+        Guides: ["docs/guides/custom-llm-providers.md"],
+        Explanation: ["docs/explanation/how-rlm-works.md"]
       ]
     ]
   end

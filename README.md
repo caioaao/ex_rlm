@@ -51,9 +51,9 @@ mix run examples/needle_in_haystack.exs
 
 ## Documentation
 
-- **[Getting Started](doc/tutorials/getting-started.md)** - Step-by-step tutorial
-- **[How RLM Works](doc/explanation/how-rlm-works.md)** - Architecture and concepts
-- **[Custom LLM Providers](doc/guides/custom-llm-providers.md)** - Implement your own provider
+- **[Getting Started](docs/tutorials/getting-started.md)** - Step-by-step tutorial
+- **[How RLM Works](docs/explanation/how-rlm-works.md)** - Architecture and concepts
+- **[Custom LLM Providers](docs/guides/custom-llm-providers.md)** - Implement your own provider
 - **[API Reference](https://hexdocs.pm/ex_rlm)** - Module documentation
 
 ## Installation
