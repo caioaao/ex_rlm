@@ -3,35 +3,18 @@ defmodule ExRLMTest do
 
   import ExRLM.TestHelpers
 
-  describe inspect(&ExRLM.new/1) do
-    test "creates instance with config" do
-      llm = static_llm("return 'test'")
-      rlm = ExRLM.new(%{llm: llm})
-
-      assert %ExRLM{} = rlm
-      assert rlm.config.llm == llm
-    end
-
-    test "history starts empty" do
-      rlm = create_rlm()
-      assert rlm.history == []
-    end
-  end
-
-  describe inspect(&ExRLM.completion/3) do
+  describe inspect(&ExRLM.completion/2) do
     test "single iteration with return value succeeds" do
       llm = static_llm("return 'final answer'")
-      rlm = create_rlm(llm)
 
-      assert {:ok, answer} = ExRLM.completion(rlm, "test query")
+      assert {:ok, answer} = ExRLM.completion("test query", llm: llm)
       assert answer == "\"final answer\""
     end
 
     test "single iteration with numeric return" do
       llm = static_llm("return 42")
-      rlm = create_rlm(llm)
 
-      assert {:ok, "42"} = ExRLM.completion(rlm, "test query")
+      assert {:ok, "42"} = ExRLM.completion("test query", llm: llm)
     end
 
     test "multi-iteration: print scripts then return" do
@@ -42,41 +25,36 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
-      assert {:ok, "\"done\""} = ExRLM.completion(rlm, "multi-step query")
+      assert {:ok, "\"done\""} = ExRLM.completion("multi-step query", llm: llm)
     end
 
     test "context passed through to REPL" do
       # LLM returns a script that prints the context
       llm = static_llm("return context")
-      rlm = create_rlm(llm)
 
-      assert {:ok, answer} = ExRLM.completion(rlm, "query", context: "my context")
+      assert {:ok, answer} = ExRLM.completion("query", llm: llm, context: "my context")
       assert answer =~ "my context"
     end
 
     test "context as list passed through to REPL" do
       llm = static_llm("return context[1]")
-      rlm = create_rlm(llm)
 
-      assert {:ok, answer} = ExRLM.completion(rlm, "query", context: ["first", "second"])
+      assert {:ok, answer} = ExRLM.completion("query", llm: llm, context: ["first", "second"])
       assert answer =~ "first"
     end
 
     test "computation in Lua works" do
       llm = static_llm("return 2 + 2")
-      rlm = create_rlm(llm)
 
-      assert {:ok, "4"} = ExRLM.completion(rlm, "what is 2+2?")
+      assert {:ok, "4"} = ExRLM.completion("what is 2+2?", llm: llm)
     end
 
     test "max_iterations: 1 with non-halting script returns error" do
       llm = static_llm("print('no return')")
-      rlm = create_rlm(llm)
 
       assert {:error, :max_iterations_reached} =
-               ExRLM.completion(rlm, "query", max_iterations: 1)
+               ExRLM.completion("query", llm: llm, max_iterations: 1)
     end
 
     test "max_iterations countdown works correctly" do
@@ -88,10 +66,9 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
       # With max_iterations: 3, should succeed
-      assert {:ok, "\"done\""} = ExRLM.completion(rlm, "query", max_iterations: 3)
+      assert {:ok, "\"done\""} = ExRLM.completion("query", llm: llm, max_iterations: 3)
     end
 
     test "max_iterations: 2 with 3 needed iterations fails" do
@@ -102,20 +79,18 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
       # With max_iterations: 2, should fail (needs 3)
       assert {:error, :max_iterations_reached} =
-               ExRLM.completion(rlm, "query", max_iterations: 2)
+               ExRLM.completion("query", llm: llm, max_iterations: 2)
     end
 
     test "default max_iterations is 10" do
       # Create LLM that always prints (never returns)
       llm = static_llm("print('loop')")
-      rlm = create_rlm(llm)
 
       # Should eventually hit max_iterations
-      assert {:error, :max_iterations_reached} = ExRLM.completion(rlm, "query")
+      assert {:error, :max_iterations_reached} = ExRLM.completion("query", llm: llm)
     end
 
     test "max_depth: 1 causes rlm.llm_query to return error" do
@@ -129,9 +104,7 @@ defmodule ExRLMTest do
         return result
         """)
 
-      rlm = create_rlm(llm)
-
-      assert {:ok, answer} = ExRLM.completion(rlm, "query", max_depth: 1)
+      assert {:ok, answer} = ExRLM.completion("query", llm: llm, max_depth: 1)
       assert answer =~ "max recursion depth reached"
     end
 
@@ -158,9 +131,7 @@ defmodule ExRLMTest do
         end
       end
 
-      rlm = create_rlm(llm)
-
-      assert {:ok, answer} = ExRLM.completion(rlm, "query", max_depth: 2)
+      assert {:ok, answer} = ExRLM.completion("query", llm: llm, max_depth: 2)
       assert answer =~ "main got"
       assert answer =~ "sub result"
     end
@@ -175,24 +146,20 @@ defmodule ExRLMTest do
         {:ok, llm_response("return 'done'")}
       end
 
-      rlm = create_rlm(llm)
-
       # Just verify the call completes without error
-      assert {:ok, _} = ExRLM.completion(rlm, "query", max_depth: 3)
+      assert {:ok, _} = ExRLM.completion("query", llm: llm, max_depth: 3)
     end
 
     test "LLM error propagated to caller" do
       llm = error_llm(:rate_limit)
-      rlm = create_rlm(llm)
 
-      assert {:error, :rate_limit} = ExRLM.completion(rlm, "query")
+      assert {:error, :rate_limit} = ExRLM.completion("query", llm: llm)
     end
 
     test "LLM network error propagated" do
       llm = error_llm({:network, :timeout})
-      rlm = create_rlm(llm)
 
-      assert {:error, {:network, :timeout}} = ExRLM.completion(rlm, "query")
+      assert {:error, {:network, :timeout}} = ExRLM.completion("query", llm: llm)
     end
 
     test "LLM error on second iteration propagated" do
@@ -202,9 +169,8 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
-      assert {:error, :api_error} = ExRLM.completion(rlm, "query")
+      assert {:error, :api_error} = ExRLM.completion("query", llm: llm)
     end
 
     test "Lua runtime error allows continuation" do
@@ -214,9 +180,8 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
-      assert {:ok, "\"recovered\""} = ExRLM.completion(rlm, "query", max_iterations: 2)
+      assert {:ok, "\"recovered\""} = ExRLM.completion("query", llm: llm, max_iterations: 2)
     end
 
     test "Lua syntax error allows continuation" do
@@ -226,9 +191,8 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
-      assert {:ok, "\"fixed\""} = ExRLM.completion(rlm, "query", max_iterations: 2)
+      assert {:ok, "\"fixed\""} = ExRLM.completion("query", llm: llm, max_iterations: 2)
     end
 
     test "variables set in earlier iterations available later" do
@@ -239,9 +203,8 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
-      assert {:ok, "30"} = ExRLM.completion(rlm, "query", max_iterations: 3)
+      assert {:ok, "30"} = ExRLM.completion("query", llm: llm, max_iterations: 3)
     end
 
     test "functions defined in earlier iterations callable later" do
@@ -251,9 +214,8 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
-      assert {:ok, "42"} = ExRLM.completion(rlm, "query", max_iterations: 2)
+      assert {:ok, "42"} = ExRLM.completion("query", llm: llm, max_iterations: 2)
     end
 
     test "accumulator pattern works across iterations" do
@@ -265,9 +227,8 @@ defmodule ExRLMTest do
       ]
 
       llm = mock_llm(responses)
-      rlm = create_rlm(llm)
 
-      assert {:ok, answer} = ExRLM.completion(rlm, "query", max_iterations: 4)
+      assert {:ok, answer} = ExRLM.completion("query", llm: llm, max_iterations: 4)
       assert answer =~ "a"
       assert answer =~ "b"
     end
@@ -276,9 +237,8 @@ defmodule ExRLMTest do
   describe "prompt selection" do
     test "iteration > 1 uses exploration prompt structure" do
       {llm, get_captured} = capture_llm("return 'done'")
-      rlm = create_rlm(llm)
 
-      ExRLM.completion(rlm, "query", max_iterations: 5)
+      ExRLM.completion("query", llm: llm, max_iterations: 5)
 
       # First call should be for iteration 5 (exploration)
       [first_messages | _] = get_captured.()
@@ -289,12 +249,6 @@ defmodule ExRLMTest do
     end
 
     test "final iteration (iteration=1) prompt is different" do
-      responses = [
-        {:ok, llm_response("print('exploring')")},
-        {:ok, llm_response("print('still exploring')")},
-        {:ok, llm_response("return 'final'")}
-      ]
-
       {:ok, agent} = Agent.start_link(fn -> [] end)
 
       llm = fn messages ->
@@ -307,8 +261,7 @@ defmodule ExRLMTest do
         end
       end
 
-      rlm = create_rlm(llm)
-      ExRLM.completion(rlm, "query", max_iterations: 3)
+      ExRLM.completion("query", llm: llm, max_iterations: 3)
 
       # Verify we made 3 calls
       calls = Agent.get(agent, & &1)

@@ -28,11 +28,10 @@ defmodule NeedleInHaystack do
     answer = Enum.random(1_000_000..9_999_999) |> to_string()
     context = generate_massive_context(1_000_000, answer)
 
-    rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o-mini")})
-
     query = "I'm looking for a magic number. What is it?"
 
-    case ExRLM.completion(rlm, query, context: context) do
+    llm = ExRLM.Completion.OpenAI.new("gpt-4o-mini")
+    case ExRLM.completion(query, llm: llm, context: context) do
       {:ok,  result} ->
         IO.puts("Result: #{result}. Expected: #{answer}")
 

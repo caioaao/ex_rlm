@@ -35,15 +35,6 @@ export OPENAI_API_KEY="sk-..."
 
 Let's create a simple script that uses ExRLM to analyze a document.
 
-### Step 1: Create the RLM Instance
-
-```elixir
-# Create an RLM with OpenAI's GPT-4o model
-rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o")})
-```
-
-### Step 2: Run a Completion
-
 ```elixir
 context = """
 The quick brown fox jumps over the lazy dog. This sentence contains every
@@ -52,8 +43,8 @@ demonstrations. It was popularized in the early 20th century.
 """
 
 {:ok, answer} = ExRLM.completion(
-  rlm,
   "What is this text commonly used for?",
+  llm: ExRLM.Completion.OpenAI.new("gpt-4o"),
   context: context
 )
 
@@ -78,8 +69,8 @@ For larger contexts, you may need more iterations:
 
 ```elixir
 {:ok, answer} = ExRLM.completion(
-  rlm,
   "Summarize all key points",
+  llm: ExRLM.Completion.OpenAI.new("gpt-4o"),
   context: very_large_document,
   max_iterations: 20,  # More iterations for complex analysis
   max_depth: 5         # Allow recursive sub-queries
@@ -89,7 +80,7 @@ For larger contexts, you may need more iterations:
 ## Handling Errors
 
 ```elixir
-case ExRLM.completion(rlm, "Analyze this", context: ctx) do
+case ExRLM.completion("Analyze this", llm: llm, context: ctx) do
   {:ok, answer} ->
     IO.puts("Answer: #{answer}")
 

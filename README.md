@@ -32,13 +32,10 @@ export OPENAI_API_KEY="sk-..."
 ```
 
 ```elixir
-# Create an RLM instance
-rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o")})
-
 # Run a completion
 {:ok, answer} = ExRLM.completion(
-  rlm,
   "What is the main theme of this text?",
+  llm: ExRLM.Completion.OpenAI.new("gpt-4o"),
   context: "Your long document here..."
 )
 ```

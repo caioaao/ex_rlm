@@ -48,7 +48,7 @@ defmodule ExRLM.Lua.Completion do
       -- Second iteration
       table.insert(results, chunk_result)  -- Still accessible
 
-  The `context` global contains the context string passed to `ExRLM.completion/3`.
+  The `context` global contains the context string passed to `ExRLM.completion/2`.
   """
 
   use Lua.API, scope: "rlm"

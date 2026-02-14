@@ -27,7 +27,7 @@ defmodule ExRLM.LLM do
         # Return {:ok, %Response{...}} or {:error, reason}
       end
 
-      rlm = ExRLM.new(%{llm: &my_provider/1})
+      {:ok, answer} = ExRLM.completion("Your query", llm: &my_provider/1)
 
   ## Types
 

@@ -74,9 +74,9 @@ end
 ### Using Your Provider
 
 ```elixir
-rlm = ExRLM.new(%{llm: MyApp.Anthropic.new("claude-sonnet-4-20250514")})
+llm = MyApp.Anthropic.new("claude-sonnet-4-20250514")
 
-{:ok, answer} = ExRLM.completion(rlm, "Analyze this", context: ctx)
+{:ok, answer} = ExRLM.completion("Analyze this", llm: llm, context: ctx)
 ```
 
 ## Testing Your Provider

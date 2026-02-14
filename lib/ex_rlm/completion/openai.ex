@@ -8,8 +8,8 @@ defmodule ExRLM.Completion.OpenAI do
 
   ## Examples
 
-      iex> llm = ExRLM.Completion.OpenAI.new("gpt-4o-mini")
-      iex> rlm = ExRLM.new(%{llm: llm})
+      llm = ExRLM.Completion.OpenAI.new("gpt-4o-mini")
+      {:ok, answer} = ExRLM.completion("Your query", llm: llm)
 
   """
   alias ExRLM.LLM.{Message, Response, Usage}

@@ -34,7 +34,7 @@ defmodule ExRLM.TestHelpers do
   ## Example
 
       llm = static_llm("return 42")
-      rlm = ExRLM.new(%{llm: llm})
+      {:ok, answer} = ExRLM.completion("query", llm: llm)
   """
   def static_llm(content) when is_binary(content) do
     fn _messages -> {:ok, llm_response(content)} end
@@ -59,7 +59,7 @@ defmodule ExRLM.TestHelpers do
   ## Example
 
       {llm, get_captured} = capture_llm("return 'test'")
-      ExRLM.completion(create_rlm(llm), "query")
+      ExRLM.completion("query", llm: llm)
       messages = get_captured.()
   """
   def capture_llm(content) when is_binary(content) do
@@ -87,14 +87,6 @@ defmodule ExRLM.TestHelpers do
         total_tokens: 15
       }
     }
-  end
-
-  @doc """
-  Creates an ExRLM instance with the given LLM function.
-  Defaults to a static LLM that returns "return 'test'".
-  """
-  def create_rlm(llm \\ static_llm("return 'test'")) do
-    ExRLM.new(%{llm: llm})
   end
 
   @doc """
