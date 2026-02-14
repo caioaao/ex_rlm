@@ -1,7 +1,5 @@
 defmodule ExRLM.Completion.Prompts.ReplFinalAnswer do
-  @moduledoc """
-  Generates message list for REPL final answer prompts (last iteration).
-  """
+  @moduledoc false
   require EEx
 
   alias ExRLM.LLM.Message

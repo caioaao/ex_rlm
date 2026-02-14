@@ -1,12 +1,76 @@
 defmodule ExRLM.LuaRepl do
+  @moduledoc """
+  Lua REPL environment for RLM execution.
+
+  This module provides a sandboxed Lua environment where the LLM can execute code
+  to analyze context. The environment runs on [Luerl](https://github.com/rvirding/luerl),
+  an Erlang implementation of Lua.
+
+  ## Sandbox Security
+
+  The following are **blocked** for security:
+
+  | Category | Blocked Functions |
+  |----------|-------------------|
+  | File I/O | `io`, `file` |
+  | System access | `os.execute`, `os.exit`, `os.getenv`, `os.remove`, `os.rename`, `os.tmpname` |
+  | Code loading | `require`, `dofile`, `load`, `loadfile`, `loadstring`, `package` |
+  | Debug/introspection | `debug`, `rawget`, `rawset`, `getmetatable`, `setmetatable` |
+  | Memory | `collectgarbage` |
+  | Coroutines | `coroutine` |
+
+  ## Available Functions
+
+  The LLM has access to standard Lua operations:
+
+  ### String Operations
+      #context                          -- size in bytes
+      string.sub(s, start, end_pos)     -- substring (1-indexed, end inclusive)
+      string.find(s, pattern)           -- returns start_pos, end_pos or nil
+      string.find(s, pattern, init)     -- search from position
+      string.match(s, pattern)          -- returns captured text or nil
+      string.lower(s) / string.upper(s) -- case conversion
+      string.gsub(s, pattern, repl)     -- replace (string replacement only!)
+
+  ### Math Operations
+      math.min(), math.max()
+      math.floor(), math.ceil()
+      math.abs(), math.sqrt()
+
+  ### Table Operations
+      table.insert(t, v)
+      table.concat(t, sep)
+      #table  -- length
+
+  ### Other
+      tonumber(s), tostring(n), type(v)
+      pairs(t), ipairs(t)
+      os.time(), os.date()
+
+  ## Luerl Limitations
+
+  Luerl has a restricted stdlib compared to standard Lua:
+
+  - `string.gmatch()` and `string.gfind()` **do not exist** - use `string.find()` in a loop
+  - `string.gsub()` only works with **string replacements**, not replacement functions
+  - For pattern-based splitting, use `string.find()` + `string.sub()` in a loop
+
+  ## Error Recovery
+
+  Lua runtime and compiler errors are captured and added to the REPL history
+  instead of crashing. This allows the LLM to see its mistakes and correct
+  them in subsequent iterations.
+  """
+
   alias ExRLM.Repl
 
   defstruct [:lua, :history]
 
-  @type t() :: %__MODULE__{
-          lua: Lua.t(),
-          history: list(Repl.Interaction.t())
-        }
+  @typedoc "Internal REPL state. Users should not access fields directly."
+  @opaque t() :: %__MODULE__{
+            lua: Lua.t(),
+            history: list()
+          }
 
   # Library defaults that we must include (since passing sandboxed: replaces, not extends)
   @library_default_sandbox [

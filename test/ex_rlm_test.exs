@@ -284,7 +284,7 @@ defmodule ExRLMTest do
       [first_messages | _] = get_captured.()
 
       # The messages should contain repl_history structure
-      messages_text = Enum.map(first_messages, & &1.content) |> Enum.join("\n")
+      messages_text = Enum.map_join(first_messages, "\n", & &1.content)
       assert messages_text =~ "repl_history" or true
     end
 

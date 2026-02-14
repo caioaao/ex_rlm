@@ -1,6 +1,57 @@
 defmodule ExRLM do
   @moduledoc """
-  An Elixir implementation of the RLM inference strategy using a Lua engine.
+  An Elixir implementation of Recursive Language Models (RLMs).
+
+  RLMs enable LLMs to reason through complex problems iteratively via a Lua REPL,
+  solving the "context rot" problem where performance degrades as context length increases.
+
+  ## Quick Start
+
+      # Create an RLM with OpenAI
+      rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o")})
+
+      # Run a completion
+      {:ok, answer} = ExRLM.completion(
+        rlm,
+        "What is the main theme of this text?",
+        context: "Your long document here..."
+      )
+
+  ## Configuration
+
+  ### `new/1` Options
+
+  | Option | Description |
+  |--------|-------------|
+  | `:llm` | A function `([Message.t]) -> {:ok, Response.t} | {:error, term}`. Use `ExRLM.Completion.OpenAI.new/1` for OpenAI. |
+
+  ### `completion/3` Options
+
+  | Option | Default | Description |
+  |--------|---------|-------------|
+  | `:context` | `""` | The context to make available in the Lua environment |
+  | `:max_iterations` | 10 | Maximum REPL iterations before returning an error |
+  | `:max_depth` | 10 | Maximum recursion depth for `rlm.llm_query()` calls |
+
+  REPL outputs longer than 100,000 characters are truncated to prevent token overflow.
+
+  ## Custom LLM Providers
+
+  You can pass any function that takes messages and returns `{:ok, %Response{}}`:
+
+      alias ExRLM.LLM.{Message, Response, Usage}
+
+      my_llm = fn messages ->
+        # messages is a list of %Message{role: "...", content: "..."}
+        {:ok, %Response{
+          content: "response",
+          usage: %Usage{prompt_tokens: 0, completion_tokens: 0, total_tokens: 0}
+        }}
+      end
+
+      rlm = ExRLM.new(%{llm: my_llm})
+
+  See `ExRLM.LLM` for the callback contract and `ExRLM.Completion.OpenAI` for a reference implementation.
   """
   require Logger
 
@@ -15,6 +66,15 @@ defmodule ExRLM do
 
   @type t() :: %__MODULE__{config: config()}
 
+  @doc """
+  Creates a new RLM instance with the given configuration.
+
+  ## Examples
+
+      iex> rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o")})
+      %ExRLM{config: %{llm: _}}
+
+  """
   @spec new(config()) :: t()
   def new(config) do
     %__MODULE__{config: config}
@@ -25,6 +85,35 @@ defmodule ExRLM do
           | {:max_iterations, pos_integer()}
           | {:context, context()}
 
+  @doc """
+  Runs an RLM completion for the given query.
+
+  The LLM will iteratively generate and execute Lua code to analyze the context
+  until it calls `return` with a final answer or hits the iteration limit.
+
+  ## Options
+
+    * `:context` - The context string available as `context` in Lua (default: `""`)
+    * `:max_iterations` - Maximum REPL iterations (default: `10`)
+    * `:max_depth` - Maximum recursion depth for `rlm.llm_query()` (default: `10`)
+
+  ## Examples
+
+      {:ok, answer} = ExRLM.completion(
+        rlm,
+        "Summarize this document",
+        context: large_document,
+        max_iterations: 15
+      )
+
+  ## Error Handling
+
+  Returns `{:error, :max_iterations_reached}` if the LLM doesn't return a final
+  answer within the iteration limit.
+
+  Lua runtime errors are captured and shown to the LLM in subsequent iterations,
+  allowing it to self-correct rather than crashing the session.
+  """
   @spec completion(t(), String.t(), keyword(completion_opt())) ::
           {:ok, String.t()} | {:error, term()}
   def completion(rlm, query, opts \\ []) do

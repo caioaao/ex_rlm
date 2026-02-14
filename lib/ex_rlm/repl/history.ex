@@ -1,11 +1,13 @@
 defmodule ExRLM.Repl.History do
+  @moduledoc false
+
   alias ExRLM.Repl.Interaction
 
   @truncation_length 100_000
 
   @type t() :: list(Interaction.t())
 
-  def new(), do: []
+  def new, do: []
 
   def push(history, kind, content),
     do: [%Interaction{kind: kind, content: content} | history]

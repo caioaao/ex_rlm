@@ -1,7 +1,5 @@
 defmodule ExRLM.Completion.Prompts.ReplCompletion do
-  @moduledoc """
-  Generates message list for REPL completion prompts (iterations 2+).
-  """
+  @moduledoc false
   require EEx
 
   alias ExRLM.LLM.Message

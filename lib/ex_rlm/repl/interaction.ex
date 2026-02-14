@@ -1,7 +1,5 @@
 defmodule ExRLM.Repl.Interaction do
-  @moduledoc """
-  Represents the interactions the LM had.
-  """
+  @moduledoc false
   defstruct [:kind, :content]
 
   @type kind() :: :script | :output
