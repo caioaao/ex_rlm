@@ -4,18 +4,15 @@ defmodule ExRLM do
   """
   require Logger
 
-  alias ExRLM.LLM
+  alias ExRLM.Completion.Prompts.{ReplCompletion, ReplFinalAnswer}
   alias ExRLM.Repl
 
   defstruct [:config, history: []]
 
   @type context() :: list(String.t())
 
-  @type config() :: %{
-          model: String.t()
-        }
+  @type config() :: %{llm: ExRLM.LLM.t()}
 
-  # TODO: strengthen model types
   @type t() :: %__MODULE__{config: config()}
 
   @spec new(config()) :: t()
@@ -89,15 +86,21 @@ defmodule ExRLM do
 
   defp call_llm(rlm, repl, query, iteration) do
     repl_history = Repl.History.format(repl.history)
-    model = rlm.config.model
 
-    if iteration > 1 do
-      LLM.ReplCompletion.call(
-        %{query: query, repl_history: repl_history, remaining: iteration},
-        %{llm_client: model}
-      )
-    else
-      LLM.ReplFinalAnswer.call(%{query: query, repl_history: repl_history}, %{llm_client: model})
+    messages =
+      if iteration > 1 do
+        ReplCompletion.build_messages(%{
+          query: query,
+          repl_history: repl_history,
+          remaining: iteration
+        })
+      else
+        ReplFinalAnswer.build_messages(%{query: query, repl_history: repl_history})
+      end
+
+    case rlm.config.llm.(messages) do
+      {:ok, %ExRLM.LLM.Response{content: content}} -> {:ok, content}
+      {:error, _} = err -> err
     end
   end
 end

@@ -31,8 +31,8 @@ export OPENAI_API_KEY="sk-..."
 ### Basic Example
 
 ```elixir
-# Create an RLM instance
-rlm = ExRLM.new(%{model: "GPT4o"})
+# Create an RLM instance with an LLM function
+rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o")})
 
 # Run a completion
 {:ok, answer} = ExRLM.completion(
@@ -47,7 +47,7 @@ IO.puts(answer)
 ### With Custom Limits
 
 ```elixir
-rlm = ExRLM.new(%{model: "GPT4oMini"})
+rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o-mini")})
 
 {:ok, answer} = ExRLM.completion(
   rlm,
@@ -56,6 +56,24 @@ rlm = ExRLM.new(%{model: "GPT4oMini"})
   max_iterations: 15,
   max_depth: 5
 )
+```
+
+### Custom LLM Function
+
+```elixir
+alias ExRLM.LLM.{Message, Response, Usage}
+
+# You can pass any function that takes messages and returns {:ok, %Response{}}
+my_llm = fn messages ->
+  # messages is a list of %Message{role: "...", content: "..."}
+  # Your custom implementation here
+  {:ok, %Response{
+    content: "response",
+    usage: %Usage{prompt_tokens: 0, completion_tokens: 0, total_tokens: 0}
+  }}
+end
+
+rlm = ExRLM.new(%{llm: my_llm})
 ```
 
 ### Needle in Haystack Example
@@ -170,7 +188,7 @@ table.insert(results, chunk_result)  -- Still accessible
 
 | Option | Description |
 |--------|-------------|
-| `:model` | BAML client name (e.g., `"GPT4o"`, `"GPT4oMini"`, `"GPT4Turbo"`) |
+| `:llm` | A function `([Message.t]) -> {:ok, Response.t} \| {:error, term}`. Use `ExRLM.Completion.OpenAI.new(model)` for OpenAI. |
 
 ### `ExRLM.completion(rlm, query, opts)`
 
@@ -274,12 +292,14 @@ end
 ## Architecture
 
 - `ExRLM` - Public API facade
+- `ExRLM.LLM` - Type definitions (`Message`, `Response`, `Usage`)
 - `ExRLM.LuaRepl` - REPL execution, Lua sandboxing, error recovery
 - `ExRLM.Lua.Completion` - Implements `rlm.llm_query()` callback
 - `ExRLM.Repl.History` - Manages REPL history with truncation
-- `ExRLM.LLM` - BAML-based LLM client with iteration-aware prompting
+- `ExRLM.Completion.OpenAI` - OpenAI API implementation using Tesla
+- `ExRLM.Completion.Prompts.*` - Prompt builders returning message lists
 
-Prompts are defined in `priv/baml_src/main.baml` using [BAML](https://docs.boundaryml.com/).
+Prompts are defined as EEx templates in `priv/templates/`.
 
 ## Next Steps
 

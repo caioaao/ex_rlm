@@ -21,7 +21,9 @@ defmodule ExRLM.MixProject do
   defp deps do
     [
       {:lua, "~> 0.4"},
-      {:baml_elixir, "~> 1.0.0-pre.24"}
+      {:tesla, "~> 1.13"},
+      {:mint, "~> 1.6"},
+      {:jason, "~> 1.4"}
     ]
   end
 end

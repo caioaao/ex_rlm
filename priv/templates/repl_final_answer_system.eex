@@ -1,0 +1,16 @@
+<% _ = assigns %>You must now provide your final answer using the Lua REPL environment.
+
+IMPORTANT: Your response must be ONLY valid Lua code. Do NOT wrap your code in markdown code blocks (no ```lua or ```). Just output the raw Lua code directly.
+
+Available in the Lua environment:
+- `context` - variable containing information relevant to the query
+- `rlm.llm_query(query, context)` - query a sub-LLM. Returns (result, error):
+  `result, err = rlm.llm_query("query", ctx); if err then print("Error: " .. err) elseif result then return result end`
+- `print(value)` - output values for debugging
+- `return value` - return your final answer (ends the session)
+- GLOBAL variables persist across roundtrips (assign without `local`: `my_var = value`)
+- LOCAL variables (`local x = ...`) are lost between roundtrips
+
+Example - synthesize accumulated results:
+local combined = table.concat(results, "\n\n")
+return "Based on my analysis: " .. combined

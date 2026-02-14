@@ -1,0 +1,24 @@
+IMPORTANT: Do not provide a final answer until you have sufficiently explored the context.
+
+Plan your exploration, then execute multiple operations in one Lua block to answer: "<%= @query %>"
+
+BATCH YOUR EXPLORATION: The context is in the `context` variable. Combine multiple operations in one Lua block:
+
+-- ANTI-PATTERN (wastes 3 roundtrips):
+-- Roundtrip 1: size = #context; print(size)
+-- Roundtrip 2: preview = string.sub(context, 1, 500); print(preview)
+-- Roundtrip 3: string.find(context, "keyword")
+
+-- EFFICIENT (1 roundtrip):
+size = #context
+head = string.sub(context, 1, 500)
+tail = string.sub(context, #context - 500)
+pos = string.find(context, "important")
+print("Size:", size, "| Keyword at:", pos or "not found")
+print("Head:", head)
+print("Tail:", tail)
+
+The history below shows your previous roundtrips:
+<%= @repl_history %>
+
+Your next action:

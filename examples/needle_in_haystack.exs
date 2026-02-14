@@ -28,7 +28,7 @@ defmodule NeedleInHaystack do
     answer = Enum.random(1_000_000..9_999_999) |> to_string()
     context = generate_massive_context(1_000_000, answer)
 
-    rlm = ExRLM.new( %{ model: "GPT4oMini"})
+    rlm = ExRLM.new(%{llm: ExRLM.Completion.OpenAI.new("gpt-4o-mini")})
 
     query = "I'm looking for a magic number. What is it?"
 
